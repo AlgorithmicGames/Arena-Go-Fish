@@ -1,0 +1,77 @@
+/* Shared face-up card chrome for interface + replay.
+   Size is driven by font-size on .card.face (width = 1em, height = 1.4em). */
+
+.card.face {
+	--card-w: 1em;
+	--card-h: 1.4em;
+	--card-glyph-scale: 1;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: var(--card-w);
+	height: var(--card-h);
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	contain: paint;
+	background: var(--card-face, #f7f3ea);
+	color: var(--card-ink, #1a1a1e);
+	border-radius: 0.08em;
+	border: 1px solid rgba(0, 0, 0, 0.22);
+	/* Match button UA font so unicode faces center the same for div/span/button. */
+	font-family: Arial, Helvetica, sans-serif;
+	line-height: 1;
+	flex: 0 0 auto;
+	user-select: none;
+}
+
+button.card.face {
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+/* Unicode already paints a frame — hide the host border so the face size matches the glyph. */
+.card.face.style-unicode {
+	border-color: transparent;
+}
+
+.card.face .card-glyph {
+	position: relative;
+	display: block;
+	font-size: var(--card-h);
+	line-height: 1;
+	transform: scale(var(--card-glyph-scale));
+	pointer-events: none;
+	user-select: none;
+}
+
+.card.face .card-text {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.08em;
+	width: 100%;
+	height: 100%;
+	line-height: 1;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
+}
+
+.card.face .card-rank {
+	font-size: calc(var(--card-h) * 0.36);
+	letter-spacing: -0.02em;
+}
+
+.card.face .card-suit {
+	font-size: calc(var(--card-h) * 0.3);
+}
+
+.card.face.red,
+.card.face.red .card-glyph,
+.card.face.red .card-text {
+	color: var(--card-red, #c0392b);
+}

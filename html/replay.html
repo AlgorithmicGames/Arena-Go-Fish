@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Arena-Go-Fish Replay</title>
+		<meta content="width=device-width, initial-scale=1.0" name="viewport">
+		<link rel="stylesheet" href="cards.css">
+		<link rel="stylesheet" href="replay.css">
+		<script src="/ReplayHelper.js"></script>
+		<script src="cards.js"></script>
+		<script src="replay.js"></script>
+	</head>
+	<body onload="_a()">
+		<div id="table">
+			<div id="hud">
+				<span id="tick-pill" class="pill">Tick 0</span>
+				<span id="pond-pill" class="pill">Pond · —</span>
+				<label class="pill toggle" title="Show pond cards face-up">
+					<input type="checkbox" id="reveal-pond">
+					Reveal pond
+				</label>
+				<label class="pill toggle" title="Pack remaining pond cards together (hide empty slots)">
+					<input type="checkbox" id="compact-pond">
+					Compact gaps
+				</label>
+				<label class="pill toggle" title="Group cards of the same rank into one stack">
+					<input type="checkbox" id="stack-by-rank" checked>
+					Stack by rank
+				</label>
+				<label class="pill toggle" id="card-style-toggle" title="Use rank and suit when playing-card symbols look wrong">
+					<input type="checkbox" id="card-style-text">
+					Rank &amp; suit
+				</label>
+			</div>
+			<div id="playfield">
+				<div id="seats"></div>
+				<div id="pond-wrap">
+					<div id="pond-label">Pond</div>
+					<div id="pond"></div>
+				</div>
+			</div>
+		</div>
+		<div id="controller">
+			<select id="matches"></select>
+			<input type="button" id="play" value="▶">
+			<input type="button" id="step-back" value="&lt;" disabled>
+			<input type="button" id="step-next" value="&gt;">
+			<input type="range" value="0" min="0" id="slider">
+		</div>
+		<div id="score-board"></div>
+	</body>
+</html>

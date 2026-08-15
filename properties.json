@@ -1,0 +1,32 @@
+{
+	"header": {
+		"defaultHumanInterfaces": [{ "name": "Human", "url": "/html/interface.html" }],
+		"limits": {
+			"teams": { "min": 2 },
+			"participantsPerTeam": { "max": 1 }
+		},
+		"replay": "/html/replay.html"
+	},
+	"settings": {
+		"rules": {
+			"startingPlayer": ["Random", "First in line"],
+			"startingHandSize": 7,
+			"minHandSize": 1,
+			"nextPlayer": ["Asked", "Clockwise"],
+			"_meta": {
+				"startingPlayer": { "comment": { "message": "Player to start the game." } },
+				"startingHandSize": { "min": 1, "comment": { "message": "Number of cards to deal to each player at the start of the game." } },
+				"minHandSize": { "min": 1, "comment": { "message": "Minimum number of cards before picking up a card from the pond." } },
+				"nextPlayer": { "comment": { "message": "Player to ask for a card." } }
+			}
+		},
+		"deck": {
+			"numberOfDecks": 1,
+			"knights": false,
+			"_meta": {
+				"numberOfDecks": { "min": 1, "comment": { "message": "Number of decks to use." } },
+				"knights": { "comment": { "message": "Whether to include knights in the deck." } }
+			}
+		}
+	}
+}

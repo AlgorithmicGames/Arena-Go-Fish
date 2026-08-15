@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Human interface for Go Fish @ Algorithmic Games</title>
+		<meta content="width=device-width, initial-scale=1.0" name="viewport">
+		<meta content="yes" name="mobile-web-app-capable">
+		<script src="/InterfaceHelper.js"></script>
+		<link rel="stylesheet" href="cards.css">
+		<script src="cards.js"></script>
+		<style>
+		:root {
+			--felt: #1a4d3a;
+			--felt-edge: #0f2e24;
+			--ink: #e8e8f0;
+			--accent: #ffd166;
+			--danger: #ef4444;
+			--card-face: #f7f3ea;
+			--card-ink: #1a1a1e;
+			--card-red: #c0392b;
+			--hand-move-ms: calc(3200ms);
+			--hand-fade-ms: calc(280ms);
+			--hand-stagger-ms: calc(45ms);
+		}
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+		}
+		body {
+			display: grid;
+			grid-template-rows: minmax(0, 1fr);
+			background:
+				radial-gradient(ellipse at 50% 35%, rgba(255, 255, 255, 0.06), transparent 55%),
+				linear-gradient(160deg, #14261f 0%, var(--felt) 45%, var(--felt-edge) 100%);
+			color: var(--ink);
+			font-family: "Segoe UI", system-ui, sans-serif;
+		}
+		#table {
+			position: relative;
+			min-height: 0;
+			display: grid;
+			grid-template-rows: auto minmax(0, 1fr) auto;
+			padding: 10px;
+			box-sizing: border-box;
+		}
+		#hud {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			align-items: flex-start;
+			justify-content: space-between;
+			z-index: 40;
+		}
+		#hud .pill {
+			background: rgba(0, 0, 0, 0.55);
+			border: 1px solid rgba(255, 255, 255, 0.15);
+			border-radius: 999px;
+			padding: 4px 10px;
+			font-size: 13px;
+		}
+		#status-pill {
+			max-width: min(42em, 70vw);
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		#top-right-stack {
+			display: flex;
+			flex-direction: column;
+			align-items: stretch;
+			gap: 8px;
+			max-width: min(18em, 45vw);
+		}
+		#playfield {
+			position: relative;
+			min-height: 0;
+			display: grid;
+			place-items: center;
+		}
+		#opponents {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+		}
+		.opponent {
+			position: absolute;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 4px;
+			pointer-events: auto;
+			padding: 6px 8px;
+			border-radius: 12px;
+			border: 1px solid transparent;
+			background: rgba(0, 0, 0, 0.25);
+			cursor: default;
+			user-select: none;
+			transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+		}
+		.opponent.selectable {
+			cursor: pointer;
+			border-color: rgba(255, 255, 255, 0.2);
+		}
+		.opponent.selectable:hover {
+			border-color: rgba(255, 255, 255, 0.45);
+			transform: scale(1.03);
+		}
+		.opponent.selected {
+			border-color: var(--accent);
+			background: rgba(255, 209, 102, 0.12);
+			box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.35);
+		}
+		.opponent.asking {
+			outline: 1px dashed rgba(255, 255, 255, 0.35);
+		}
+		.opponent-label {
+			font-size: 12px;
+			opacity: 0.9;
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+		.opponent-swatch {
+			width: 0.7em;
+			height: 0.7em;
+			border-radius: 50%;
+			border: 1px solid rgba(255, 255, 255, 0.35);
+			flex: 0 0 auto;
+		}
+		.opponent-backs {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			max-width: min(40vw, 16em);
+			min-height: 2.4em;
+		}
+		.opponent-backs .card {
+			margin-left: -0.85em;
+			font-size: clamp(1.4rem, 3.5vw, 2rem);
+			line-height: 1;
+			filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+		}
+		.opponent-backs .card:first-child {
+			margin-left: 0;
+		}
+		.opponent-count {
+			font-variant-numeric: tabular-nums;
+			font-size: 12px;
+			opacity: 0.8;
+		}
+		#pond-wrap {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 8px;
+			z-index: 2;
+		}
+		#pond-label {
+			font-size: 12px;
+			opacity: 0.75;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+		}
+		#pond {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			max-width: min(70vw, 28em);
+			min-height: 3.2em;
+		}
+		#pond .card,
+		#hand .card,
+		.opponent {
+			appearance: none;
+			-webkit-appearance: none;
+			padding: 0;
+		}
+		#pond .card {
+			margin: 0.1em;
+			font-size: clamp(1.8rem, 5vw, 2.6rem);
+			line-height: 1;
+			cursor: default;
+			user-select: none;
+			border: none;
+			color: inherit;
+			background: transparent;
+			transition: transform 120ms ease, filter 120ms ease;
+			filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+		}
+		#pond.interactive .card {
+			cursor: pointer;
+		}
+		#pond.interactive .card:hover {
+			transform: translateY(-6px) scale(1.08);
+			filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+		}
+		#prompt {
+			min-height: 1.4em;
+			text-align: center;
+			font-size: 14px;
+			opacity: 0.9;
+			padding: 0 8px;
+		}
+		#prompt strong {
+			color: var(--accent);
+			font-weight: 600;
+		}
+		#hand-section {
+			display: grid;
+			gap: 6px;
+			justify-items: center;
+			padding-bottom: 4px;
+		}
+		#hand-label {
+			font-size: 12px;
+			opacity: 0.75;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+		}
+		#ask-log {
+			width: min(96vw, 36em);
+			max-height: 13em;
+			overflow-y: auto;
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+			padding: 4px 8px;
+			box-sizing: border-box;
+			font-size: 12px;
+			line-height: 1.35;
+			opacity: 0.9;
+			background: rgba(0, 0, 0, 0.28);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			border-radius: 8px;
+		}
+		#ask-log:empty {
+			display: none;
+		}
+		#ask-log .ask-log-entry {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.35em 0.5em;
+			align-items: baseline;
+		}
+		#ask-log .ask-log-who {
+			font-weight: 600;
+		}
+		#ask-log .ask-log-card {
+			color: var(--accent);
+			font-weight: 600;
+		}
+		#ask-log .ask-log-result {
+			opacity: 0.75;
+		}
+		#hand {
+			position: relative;
+			width: min(96vw, 56em);
+			height: clamp(8.5rem, 24vh, 12rem);
+			display: flex;
+			justify-content: center;
+			align-items: flex-end;
+			perspective: 800px;
+		}
+		#hand .card.face {
+			/* font-size = card width; height is 1.4em via shared/cards.css */
+			font-size: clamp(3.6rem, 9vw, 5rem);
+			position: absolute;
+			bottom: 0.4rem;
+			box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+			cursor: default;
+			transform-origin: 50% 120%;
+			opacity: 1;
+			transition:
+				transform var(--hand-move-ms) cubic-bezier(0.22, 1, 0.36, 1),
+				left var(--hand-move-ms) cubic-bezier(0.22, 1, 0.36, 1),
+				bottom 220ms ease,
+				box-shadow 140ms ease,
+				opacity var(--hand-fade-ms) ease;
+		}
+		#hand .card.face.no-transition {
+			transition: none !important;
+		}
+		#hand .card.face.leaving {
+			opacity: 0;
+			pointer-events: none;
+			z-index: 0 !important;
+		}
+		#hand.interactive .card.face {
+			cursor: pointer;
+		}
+		/*
+		 * Hover/selection must clear the whole fan. Resting z-index is
+		 * groupIndex*20 + stackDepth, so a fixed 20/50 lets later stacks cut
+		 * through under-cards — or bury the hovered stack entirely.
+		 */
+		#hand.interactive .card.face:hover:not(.has-deck-counts):not(.stacked-under),
+		#hand .card.face.selected:not(.has-deck-counts):not(.stacked-under) {
+			bottom: 1.25rem;
+			box-shadow: 0 10px 18px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--accent);
+			z-index: 1000 !important;
+		}
+		/* Stack top with counters: stay put; --stack-z keeps top above under-cards */
+		#hand.interactive .card.face.has-deck-counts:hover,
+		#hand .card.face.has-deck-counts.stack-hover,
+		#hand .card.face.has-deck-counts.selected {
+			bottom: 0.4rem;
+			box-shadow: 0 10px 18px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--accent);
+			z-index: calc(1000 + var(--stack-z, 50)) !important;
+		}
+		/* Under cards peek upward; same 1000 floor so the whole stack is on top */
+		#hand .card.face.stacked-under.stack-hover,
+		#hand .card.face.stacked-under.selected {
+			bottom: calc(0.4rem + var(--stack-reveal, 0.9rem));
+			box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+			z-index: calc(1000 + var(--stack-z, 1)) !important;
+		}
+		#hand .card.face.stacked-under {
+			pointer-events: none;
+		}
+		@media (prefers-reduced-motion: reduce) {
+			#hand .card.face {
+				transition: box-shadow 140ms ease, bottom 140ms ease;
+			}
+		}
+		#card-style-toggle,
+		#stack-by-rank-toggle {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			cursor: pointer;
+			user-select: none;
+		}
+		#card-style-toggle input,
+		#stack-by-rank-toggle input {
+			accent-color: var(--accent);
+			margin: 0;
+		}
+		#hand .card.face .card-suit-counts {
+			position: absolute;
+			right: 0.06em;
+			top: 0.06em;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+			gap: 0.08em;
+			z-index: 3;
+			pointer-events: none;
+		}
+		#hand .card.face.has-deck-counts {
+			overflow: visible;
+			contain: none;
+		}
+		#hand .card.face .suit-count {
+			min-width: 1.15em;
+			height: 1.15em;
+			padding: 0 0.22em;
+			box-sizing: border-box;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.08em;
+			border-radius: 0.28em;
+			border: 1px solid rgba(0, 0, 0, 0.22);
+			background: rgba(247, 243, 234, 0.96);
+			font-size: 0.22em;
+			font-weight: 700;
+			font-variant-numeric: tabular-nums;
+			line-height: 1;
+			color: var(--card-ink);
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+		}
+		#hand .card.face .suit-count.red {
+			color: var(--card-red);
+		}
+		#hand .card.face .suit-count-mark {
+			font-size: 1.05em;
+			line-height: 1;
+		}
+		#lock {
+			display: none;
+		}
+		#table:has(#lock.booting) {
+			min-height: min(42vh, 360px);
+		}
+		#lock.engaged {
+			justify-content: center;
+			align-items: center;
+			position: absolute;
+			inset: 0;
+			display: flex;
+			z-index: 9999;
+			box-sizing: border-box;
+			font-size: xxx-large;
+			text-align: center;
+			background: rgba(0, 0, 0, 0.72);
+		}
+		.interactive,
+		.selectable {
+			animation: pulse-pending 1.2s ease-in-out infinite;
+		}
+		@keyframes pulse-pending {
+			0%,
+			100% {
+				filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+			}
+			50% {
+				filter: drop-shadow(0 0 8px rgba(255, 209, 102, 0.55));
+			}
+		}
+		</style>
+		<script>
+		'use strict'
+
+		const {
+			CARD_BACK,
+			cardFace,
+			cardDeck,
+			cardRank,
+			cardSuit,
+			isRedSuit,
+			rankLabel,
+			suitLabel,
+			deckColor,
+			sortHand,
+			groupHandByRank,
+			suitCountsForGroup,
+			appendCardFace,
+			bootStyle,
+			onStyleChange,
+		} = GoFishCards
+
+		/** @type {object | null} */
+		let _session = null
+		/** @type {unknown} */
+		let _init = null
+		let _humanTeam = 0
+
+		function boot() {
+			bootStyle(document.getElementById('card-style-text'))
+			onStyleChange(() => {
+				if (_session) renderHand(_session)
+			})
+			const stackToggle = document.getElementById('stack-by-rank')
+			if (stackToggle) {
+				stackToggle.checked = true
+				stackToggle.addEventListener('change', () => {
+					if (_session) renderHand(_session)
+				})
+			}
+			InterfaceHelper.onInit((init, workerAdded) => {
+				_init = init
+				_humanTeam = Array.isArray(init.opponents) ? init.opponents.findIndex((o) => o === null) : 0
+				if (_humanTeam < 0) _humanTeam = 0
+				workerAdded(registerWorker)
+			})
+			InterfaceHelper.signalReady()
+		}
+
+		function stackByRankEnabled() {
+			const toggle = document.getElementById('stack-by-rank')
+			return toggle ? !!toggle.checked : true
+		}
+
+		/** @param {unknown[]} sorted */
+		function handDisplayGroups(sorted) {
+			if (!stackByRankEnabled()) {
+				return sorted.map((card) => [card])
+			}
+			return groupHandByRank(sorted)
+		}
+
+		/** @param {HTMLElement} el @param {unknown[]} group @param {boolean} isTop */
+		function syncSuitCountBadges(el, group, isTop) {
+			el.querySelector('.card-suit-counts')?.remove()
+			el.classList.remove('has-deck-counts')
+			if (!isTop || group.length < 2) return
+			const wrap = document.createElement('span')
+			wrap.className = 'card-suit-counts'
+			for (const [suit, count] of suitCountsForGroup(group)) {
+				const sample = group.find((card) => cardSuit(card) === suit)
+				const badge = document.createElement('span')
+				badge.className = 'suit-count'
+				if (sample && isRedSuit(sample)) badge.classList.add('red')
+				const countEl = document.createElement('span')
+				countEl.className = 'suit-count-num'
+				countEl.textContent = String(count)
+				const suitEl = document.createElement('span')
+				suitEl.className = 'suit-count-mark'
+				suitEl.textContent = sample ? suitLabel(sample) : '?'
+				badge.appendChild(countEl)
+				badge.appendChild(suitEl)
+				badge.title = sample ? `${count}× ${suitLabel(sample)}` : String(count)
+				wrap.appendChild(badge)
+			}
+			el.appendChild(wrap)
+			el.classList.add('has-deck-counts')
+		}
+
+		function arenaSettings() {
+			const init = _init
+			if (!init || typeof init !== 'object') return {}
+			if (init.settings && typeof init.settings === 'object') return init.settings
+			return {}
+		}
+
+		function startingHandSize() {
+			const value = Number(arenaSettings().rules?.startingHandSize ?? 7)
+			return Number.isFinite(value) && 0 < value ? value : 7
+		}
+
+		function cardsPerDeck() {
+			return (arenaSettings().deck?.knights ? 14 : 13) * 4
+		}
+
+		function teamCount() {
+			const opponents = _init?.opponents
+			return Array.isArray(opponents) && opponents.length ? opponents.length : 2
+		}
+
+		function createWorkerSession(worker) {
+			const counts = []
+			const teams = teamCount()
+			const start = startingHandSize()
+			for (let i = 0; i < teams; i++) {
+				counts[i] = start
+			}
+			return {
+				worker,
+				pending: false,
+				dead: false,
+				awaiting: null,
+				hand: [],
+				pond: [],
+				handCounts: counts,
+				selectedOpponent: null,
+				selectedCard: null,
+				askLog: [],
+				lastEvent: 'Waiting for the arena…',
+			}
+		}
+
+		function syncStatusUi() {
+			const table = document.getElementById('table')
+			if (table) table.classList.toggle('pending-message', !!_session?.pending && !_session?.dead)
+		}
+
+		function registerWorker(worker) {
+			if (_session) return
+			const session = createWorkerSession(worker)
+			_session = session
+			worker.onMessage = (message) => {
+				onWorkerMessage(message.data)
+			}
+			worker.onKilled = () => {
+				session.pending = false
+				session.dead = true
+				syncStatusUi()
+				render()
+			}
+			syncStatusUi()
+		}
+
+		function applyHand(session, hand) {
+			if (!Array.isArray(hand)) return
+			session.hand = hand
+			session.handCounts[_humanTeam] = hand.length
+		}
+
+		function applyOpponentsHandSizes(session, sizes) {
+			if (!Array.isArray(sizes)) return
+			for (let team = 0; team < sizes.length; team++) {
+				const size = sizes[team]
+				if (typeof size === 'number' && Number.isFinite(size)) {
+					session.handCounts[team] = Math.max(0, size | 0)
+				}
+			}
+		}
+
+		function playerLabel(team) {
+			return team === _humanTeam ? 'You' : `Player ${team + 1}`
+		}
+
+		function applyHandUpdate(session, data) {
+			const asking = Number(data.askingPlayer)
+			const asked = Number(data.playerAsked)
+			const result = Number(data.result) || 0
+			if (Number.isFinite(asking) && Number.isFinite(asked)) {
+				if (Number.isFinite(session.handCounts[asked])) {
+					session.handCounts[asked] -= result
+				}
+				if (Number.isFinite(session.handCounts[asking])) {
+					session.handCounts[asking] += result
+				}
+				const askFace = cardFace(data.card)
+				session.lastEvent = result ? `${playerLabel(asking)} asked ${playerLabel(asked)} for ${askFace} — got ${result}` : `${playerLabel(asking)} asked ${playerLabel(asked)} for ${askFace} — go fish`
+				if (asking !== _humanTeam) {
+					session.askLog.push({
+						asking,
+						asked,
+						card: data.card,
+						result,
+					})
+				}
+				if (asking === _humanTeam && 0 < result) {
+					session.cardInsertOrigin = { type: 'opponent', team: asked }
+				}
+			}
+			applyHand(session, data.hand)
+		}
+
+		function respondForSession(session, response) {
+			if (session.dead) return
+			const messageIndex = session.worker._lastMessageIndex
+			session.worker.respond(response, {
+				executionSteps: { toRespond: 0, toTerminate: 0 },
+				...(typeof messageIndex === 'number' ? { messageIndex } : {}),
+			})
+			session.pending = false
+			session.awaiting = null
+			session.selectedCard = null
+			session.selectedOpponent = null
+			syncStatusUi()
+			render()
+		}
+
+		function onWorkerMessage(data) {
+			const session = _session
+			if (!session || session.dead) return
+			const lock = document.getElementById('lock')
+			lock.classList.remove('engaged', 'booting')
+
+			const type = data?.type
+			session.selectedCard = null
+			session.selectedOpponent = null
+
+			if (Array.isArray(data?.pond)) {
+				session.pond = data.pond
+			}
+			switch (type) {
+				default:
+					respondForSession(session, null)
+					break
+				case 'starting-hand':
+					applyHand(session, data.hand)
+					respondForSession(session, null)
+					break
+				case 'hand-update':
+					applyHandUpdate(session, data)
+					respondForSession(session, null)
+					break
+				case 'ask':
+					applyHand(session, data.hand)
+					applyOpponentsHandSizes(session, data.opponentsHandSizes)
+					session.lastEvent = 'Your turn — ask an opponent for a card'
+					session.awaiting = 'ask'
+					session.pending = true
+					break
+				case 'go-fish':
+					session.pond = data.pond
+					session.lastEvent = 'Go fish — pick a card from the pond'
+					session.awaiting = 'go-fish'
+					session.pending = true
+					break
+				case 'pick-up':
+					session.pond = data.pond
+					session.lastEvent = 'Pick up — take a card from the pond'
+					session.awaiting = 'pick-up'
+					session.pending = true
+					break
+			}
+
+			render()
+		}
+
+		function tryAsk(session) {
+			if (session.awaiting !== 'ask' || !session.pending) return
+			if (session.selectedOpponent == null || session.selectedCard == null) return
+			respondForSession(session, {
+				player: session.selectedOpponent,
+				cardId: session.selectedCard.id,
+			})
+		}
+
+		function onOpponentClick(team) {
+			const session = _session
+			if (!session || session.dead || !session.pending) return
+			if (session.awaiting !== 'ask') return
+			if (team === _humanTeam) return
+			session.selectedOpponent = team
+			render()
+			tryAsk(session)
+		}
+
+		function onHandCardClick(card) {
+			const session = _session
+			if (!session || session.dead || !session.pending) return
+			if (session.awaiting !== 'ask') return
+			session.selectedCard = card
+			render()
+			tryAsk(session)
+		}
+
+		function onPondCardClick(index) {
+			const session = _session
+			if (!session || session.dead || !session.pending) return
+			if (session.awaiting !== 'go-fish' && session.awaiting !== 'pick-up') return
+			respondForSession(session, index)
+		}
+
+		function opponentPositions(count) {
+			/** Place other players around the table; seat 0 is bottom (human). */
+			if (count <= 2) {
+				return [{ left: '50%', top: '8%', transform: 'translateX(-50%)' }]
+			}
+			if (count === 3) {
+				return [
+					{ left: '18%', top: '18%', transform: 'translateX(-50%)' },
+					{ left: '82%', top: '18%', transform: 'translateX(-50%)' },
+				]
+			}
+			if (count === 4) {
+				return [
+					{ left: '50%', top: '6%', transform: 'translateX(-50%)' },
+					{ left: '8%', top: '40%', transform: 'translateX(-50%)' },
+					{ left: '92%', top: '40%', transform: 'translateX(-50%)' },
+				]
+			}
+			const positions = []
+			const others = count - 1
+			for (let i = 0; i < others; i++) {
+				const t = (i + 1) / (others + 1)
+				const angle = Math.PI * (0.15 + 0.7 * t)
+				const x = 50 + Math.cos(angle) * 42
+				const y = 48 - Math.sin(angle) * 38
+				positions.push({
+					left: x + '%',
+					top: y + '%',
+					transform: 'translate(-50%, -50%)',
+				})
+			}
+			return positions
+		}
+
+		function renderOpponents(session) {
+			const root = document.getElementById('opponents')
+			root.replaceChildren()
+			const teams = teamCount()
+			const seats = []
+			for (let team = 0; team < teams; team++) {
+				if (team === _humanTeam) continue
+				seats.push(team)
+			}
+			const positions = opponentPositions(teams)
+			seats.forEach((team, index) => {
+				const style = positions[index] ?? positions[positions.length - 1] ?? {
+					left: '50%',
+					top: '10%',
+					transform: 'translateX(-50%)',
+				}
+				const el = document.createElement('button')
+				el.type = 'button'
+				el.className = 'opponent'
+				el.style.left = style.left
+				el.style.top = style.top
+				el.style.transform = style.transform
+				el.style.padding = '5px 10px'
+				const selectable = session.awaiting === 'ask' && session.pending && !session.dead
+				if (selectable) el.classList.add('selectable')
+				if (session.selectedOpponent === team) el.classList.add('selected')
+				if (session.lastEvent.includes(`Player ${team + 1}`)) el.classList.add('asking')
+
+				const color = InterfaceHelper.GetColor(team, 0)
+				const label = document.createElement('div')
+				label.className = 'opponent-label'
+				const swatch = document.createElement('span')
+				swatch.className = 'opponent-swatch'
+				swatch.style.background = color.RGB
+				label.appendChild(swatch)
+				label.appendChild(document.createTextNode('Player ' + (team + 1)))
+
+				const backs = document.createElement('div')
+				backs.className = 'opponent-backs'
+				const count = Math.max(0, session.handCounts[team] ?? 0)
+				const show = Math.min(count, 12)
+				for (let i = 0; i < show; i++) {
+					const card = document.createElement('span')
+					card.className = 'card'
+					card.textContent = CARD_BACK
+					card.style.color = deckColor(i % Math.max(1, Number(arenaSettings().deck?.numberOfDecks) || 1))
+					backs.appendChild(card)
+				}
+				if (count === 0) {
+					const empty = document.createElement('span')
+					empty.className = 'opponent-count'
+					empty.textContent = 'empty'
+					backs.appendChild(empty)
+				}
+
+				const countEl = document.createElement('div')
+				countEl.className = 'opponent-count'
+				countEl.textContent = count + (count === 1 ? ' card' : ' cards')
+
+				el.appendChild(label)
+				el.appendChild(backs)
+				el.appendChild(countEl)
+				el.onclick = () => onOpponentClick(team)
+				root.appendChild(el)
+			})
+		}
+
+		function renderPond(session) {
+			const pond = document.getElementById('pond')
+			const label = document.getElementById('pond-label')
+			pond.replaceChildren()
+			const interactive = (session.awaiting === 'go-fish' || session.awaiting === 'pick-up') &&
+				session.pending && !session.dead
+			pond.classList.toggle('interactive', interactive)
+			const n = session.pond.length
+			label.textContent = n ? `Pond · ${n}` : 'Pond · empty'
+			const fontSize = n > 40 ? '1.35rem' : n > 24 ? '1.7rem' : ''
+			session.pond.forEach((deck, index) => {
+				const card = document.createElement(interactive ? 'button' : 'span')
+				if (interactive) card.type = 'button'
+				card.className = 'card'
+				card.textContent = CARD_BACK
+				card.style.color = deckColor(deck)
+				if (fontSize) card.style.fontSize = fontSize
+				card.title = interactive ? 'Draw card #' + (index + 1) : 'Card in pond'
+				if (interactive) {
+					card.onclick = () => onPondCardClick(index)
+				}
+				pond.appendChild(card)
+			})
+		}
+
+		function cardKey(card) {
+			if (card && Number.isFinite(card.id)) return 'id:' + card.id
+			return 'face:' + cardFace(card) + ':' + cardDeck(card)
+		}
+
+		function handFanLayout(count, index, stackDepth = 0, stackSize = 1) {
+			const spread = Math.min(52, 8 + count * 3.2)
+			const t = count <= 1 ? 0 : (index / (count - 1)) * 2 - 1
+			const angle = t * spread
+			const y = Math.abs(t) * 18
+			const fromTop = stackDepth - (stackSize - 1)
+			const ox = fromTop * -3
+			const oy = fromTop * 3
+			return {
+				transform: `translateX(-50%) rotate(${angle}deg) translateY(${y}px) translate(${ox}px, ${oy}px)`,
+				left: `calc(50% + ${t * Math.min(42, 10 + count * 1.6)}%)`,
+				zIndex: String(index * 20 + stackDepth + 1),
+			}
+		}
+
+		function pointInHand(handEl, clientX, clientY) {
+			const rect = handEl.getBoundingClientRect()
+			return {
+				leftPx: clientX - rect.left,
+				bottomPx: rect.bottom - clientY,
+			}
+		}
+
+		function resolveCardInsertOrigin(session, handEl) {
+			const origin = session.cardInsertOrigin
+			session.cardInsertOrigin = null
+			if (origin?.type === 'opponent' && Number.isFinite(origin.team)) {
+				const opponents = document.getElementById('opponents')
+				const buttons = opponents ? [...opponents.querySelectorAll('.opponent')] : []
+				const teams = teamCount()
+				const seats = []
+				for (let team = 0; team < teams; team++) {
+					if (team !== _humanTeam) seats.push(team)
+				}
+				const seatIndex = seats.indexOf(origin.team)
+				const el = 0 <= seatIndex ? buttons[seatIndex] : null
+				if (el) {
+					const r = el.getBoundingClientRect()
+					if (r.width || r.height) {
+						return pointInHand(handEl, r.left + r.width / 2, r.top + r.height / 2)
+					}
+				}
+			}
+			const pond = document.getElementById('pond')
+			if (pond) {
+				const r = pond.getBoundingClientRect()
+				if (r.width || r.height) {
+					return pointInHand(handEl, r.left + r.width / 2, r.top + r.height / 2)
+				}
+			}
+			const handRect = handEl.getBoundingClientRect()
+			return pointInHand(handEl, handRect.left + handRect.width / 2, handRect.top)
+		}
+
+		function prefersReducedMotion() {
+			return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+		}
+
+		function handAnimMs(varName) {
+			const handEl = document.getElementById('hand')
+			const raw = getComputedStyle(handEl).getPropertyValue(varName).trim()
+			return Number.parseFloat(raw.replace(/\D/g, ''))
+		}
+
+		function renderHand(session) {
+			const handEl = document.getElementById('hand')
+			const label = document.getElementById('hand-label')
+			const interactive = session.awaiting === 'ask' && session.pending && !session.dead
+			handEl.classList.toggle('interactive', interactive)
+			const sorted = sortHand(session.hand)
+			const groups = handDisplayGroups(sorted)
+			const stacked = stackByRankEnabled()
+			if (label) {
+				label.textContent = sorted.length ? `Your hand · ${sorted.length}` : 'Your hand · empty'
+			}
+
+			/** @type {Map<string, HTMLElement>} */
+			const previous = new Map()
+			for (const child of handEl.children) {
+				if (!(child instanceof HTMLElement)) continue
+				if (child.classList.contains('leaving')) continue
+				const key = child.dataset.cardKey
+				if (key) previous.set(key, child)
+			}
+
+			const nextKeys = new Set(sorted.map(cardKey))
+			const moveMs = handAnimMs('--hand-move-ms')
+			const fadeMs = handAnimMs('--hand-fade-ms')
+			const staggerMs = handAnimMs('--hand-stagger-ms')
+			for (const [key, el] of previous) {
+				if (nextKeys.has(key)) continue
+				previous.delete(key)
+				el.classList.remove('selected', 'entering', 'stacked-under', 'has-deck-counts', 'stack-hover')
+				el.querySelector('.card-suit-counts')?.remove()
+				el.classList.add('leaving')
+				el.style.pointerEvents = 'none'
+				el.onclick = null
+				el.onmouseenter = null
+				el.onmouseleave = null
+				el.style.transform = 'translateX(-50%) translateY(-36px) scale(0.65)'
+				el.style.opacity = '0'
+				const remove = () => {
+					if (el.parentNode === handEl) el.remove()
+				}
+				el.addEventListener('transitionend', remove, { once: true })
+				setTimeout(remove, Math.max(moveMs, fadeMs) + 80)
+			}
+
+			const n = groups.length
+			const reduced = prefersReducedMotion()
+			const insertOrigin = sorted.some((card) => !previous.has(cardKey(card))) ? resolveCardInsertOrigin(session, handEl) : null
+			let enterIndex = 0
+
+			groups.forEach((group, groupIndex) => {
+				group.forEach((card, stackIndex) => {
+					const key = cardKey(card)
+					let el = previous.get(key)
+					const isNew = !el
+					if (!el) {
+						el = document.createElement('button')
+						el.type = 'button'
+						el.className = 'card'
+						el.dataset.cardKey = key
+					}
+					/* Re-append so DOM order matches fan order (left→right, under→top). */
+					handEl.appendChild(el)
+
+					appendCardFace(el, card)
+					const face = cardFace(card)
+					const deck = cardDeck(card)
+					const rank = cardRank(card)
+					const isTop = stackIndex === group.length - 1
+					const inStack = stacked && group.length > 1
+					syncSuitCountBadges(el, group, inStack && isTop)
+					el.classList.toggle('stacked-under', inStack && !isTop)
+					el.dataset.stackRank = String(rank)
+					if (inStack) {
+						/* Relative order within the stack; hover CSS adds a 1000 floor. */
+						el.style.setProperty('--stack-z', String(stackIndex))
+						if (!isTop) {
+							el.style.setProperty('--stack-reveal', `${(group.length - stackIndex) * 0.55}rem`)
+						} else {
+							el.style.removeProperty('--stack-reveal')
+						}
+					} else {
+						el.style.removeProperty('--stack-z')
+						el.style.removeProperty('--stack-reveal')
+					}
+					if (1 < arenaSettings().deck?.numberOfDecks) {
+						el.style.boxShadow = `0 4px 10px rgba(0,0,0,0.35), inset 0 3px 0 ${deckColor(deck)}, inset 0 -3px 0 ${deckColor(deck)}`
+						el.style.paddingTop = '1.5px'
+					} else {
+						el.style.boxShadow = ''
+						el.style.paddingTop = ''
+					}
+
+					const selected = session.selectedCard != null && (
+						stacked ? cardRank(session.selectedCard) === rank : cardFace(session.selectedCard) === face &&
+							cardDeck(session.selectedCard) === deck
+					)
+					el.classList.toggle('selected', selected)
+					el.onclick = interactive && isTop ? () => onHandCardClick(card) : null
+
+					if (inStack && isTop) {
+						const setStackHover = (on) => {
+							handEl.querySelectorAll(`.card.face[data-stack-rank="${rank}"]`).forEach((node) => {
+								node.classList.toggle('stack-hover', on)
+							})
+						}
+						el.onmouseenter = () => setStackHover(true)
+						el.onmouseleave = () => setStackHover(false)
+					} else {
+						el.onmouseenter = null
+						el.onmouseleave = null
+						if (!inStack) el.classList.remove('stack-hover')
+					}
+
+					const layout = handFanLayout(n, groupIndex, stackIndex, group.length)
+					el._pendingHandLayout = layout
+
+					const flushLayout = (keepDelay = false) => {
+						const next = el._pendingHandLayout
+						if (!next) return
+						el.style.left = next.left
+						el.style.bottom = ''
+						el.style.transform = next.transform
+						el.style.opacity = '1'
+						el.style.zIndex = next.zIndex
+						el.classList.remove('no-transition')
+						if (!keepDelay) {
+							el.style.transitionDelay = ''
+							el.classList.remove('entering')
+							delete el.dataset.animatingIn
+							return
+						}
+						const delayMs = Number.parseInt(el.style.transitionDelay, 10) || 0
+						const clearDelay = () => {
+							el.style.transitionDelay = ''
+							el.classList.remove('entering')
+							delete el.dataset.animatingIn
+						}
+						el.addEventListener('transitionend', clearDelay, { once: true })
+						setTimeout(clearDelay, moveMs + fadeMs + delayMs + 80)
+					}
+
+					if (isNew && !reduced && insertOrigin) {
+						const stagger = enterIndex * staggerMs
+						enterIndex += 1
+						el.dataset.animatingIn = '1'
+						el.classList.add('entering', 'no-transition')
+						el.style.left = insertOrigin.leftPx + 'px'
+						el.style.bottom = insertOrigin.bottomPx + 'px'
+						el.style.transform = 'translateX(-50%) rotate(0deg) scale(0.55)'
+						el.style.opacity = '0.35'
+						el.style.zIndex = '60'
+						el.style.transitionDelay = stagger + 'ms'
+						void el.offsetWidth
+						el.classList.remove('no-transition')
+						if (!el._enterFlushScheduled) {
+							el._enterFlushScheduled = true
+							requestAnimationFrame(() => {
+								requestAnimationFrame(() => {
+									el._enterFlushScheduled = false
+									flushLayout(true)
+								})
+							})
+						}
+					} else if (el.dataset.animatingIn) {
+						// Keep flight in progress; pending layout updates on the next flush.
+						if (!el._enterFlushScheduled) flushLayout(true)
+					} else {
+						flushLayout(false)
+					}
+				})
+			})
+		}
+
+		function renderPrompt(session) {
+			const prompt = document.getElementById('prompt')
+			const status = document.getElementById('status-pill')
+			status.textContent = session.lastEvent
+			if (session.dead) {
+				prompt.textContent = 'This worker is done.'
+				return
+			}
+			if (!session.pending || !session.awaiting) {
+				prompt.textContent = 'Waiting for the next message…'
+				return
+			}
+			if (session.awaiting === 'ask') {
+				const rankHint = session.selectedCard != null ? ` <strong>${rankLabel(session.selectedCard)}</strong>` : ''
+				if (session.selectedOpponent == null && session.selectedCard == null) {
+					prompt.innerHTML = 'Select an <strong>opponent</strong> and a <strong>rank</strong> from your hand.'
+				} else if (session.selectedOpponent == null) {
+					prompt.innerHTML = `Asking for${rankHint} — now choose an <strong>opponent</strong>.`
+				} else if (session.selectedCard == null) {
+					prompt.innerHTML = 'Opponent selected — now choose a <strong>rank</strong>.'
+				} else {
+					prompt.innerHTML = `Asking for${rankHint}…`
+				}
+				return
+			}
+			if (session.awaiting === 'go-fish') {
+				prompt.innerHTML = '<strong>Go fish</strong> — click a card in the pond.'
+				return
+			}
+			if (session.awaiting === 'pick-up') {
+				prompt.innerHTML = '<strong>Pick up</strong> — click a card in the pond.'
+				return
+			}
+			prompt.textContent = ''
+		}
+
+		function renderAskLog(session) {
+			const root = document.getElementById('ask-log')
+			if (!root) return
+			root.replaceChildren()
+			for (let i = session.askLog.length - 1; 0 <= i; i--) {
+				const entry = session.askLog[i]
+				const row = document.createElement('div')
+				row.className = 'ask-log-entry'
+				const who = document.createElement('span')
+				who.className = 'ask-log-who'
+				who.textContent = `${playerLabel(entry.asking)} → ${playerLabel(entry.asked)}`
+				const card = document.createElement('span')
+				card.className = 'ask-log-card'
+				card.textContent = rankLabel(entry.card)
+				const outcome = document.createElement('span')
+				outcome.className = 'ask-log-result'
+				outcome.textContent = entry.result ? `got ${entry.result}` : 'go fish'
+				row.appendChild(who)
+				row.appendChild(card)
+				row.appendChild(outcome)
+				root.appendChild(row)
+			}
+		}
+
+		function render() {
+			const session = _session
+			if (!session) return
+			renderOpponents(session)
+			renderPond(session)
+			renderHand(session)
+			renderAskLog(session)
+			renderPrompt(session)
+			syncStatusUi()
+		}
+
+		globalThis.boot = boot
+		</script>
+	</head>
+	<body onload="boot()">
+		<div id="table">
+			<div id="hud">
+				<div class="pill" id="status-pill">Waiting for arena…</div>
+				<div id="top-right-stack">
+					<label class="pill" id="stack-by-rank-toggle" title="Group cards of the same rank into one stack">
+						<input type="checkbox" id="stack-by-rank" checked>
+						Stack by rank
+					</label>
+					<label class="pill" id="card-style-toggle" title="Use rank and suit when playing-card symbols look wrong">
+						<input type="checkbox" id="card-style-text">
+						Rank &amp; suit
+					</label>
+				</div>
+			</div>
+			<div id="playfield">
+				<div id="opponents"></div>
+				<div id="pond-wrap">
+					<div id="pond-label">Pond</div>
+					<div id="pond"></div>
+					<div id="prompt">Waiting for the arena…</div>
+					<div id="ask-log" aria-label="Opponent ask log"></div>
+				</div>
+			</div>
+			<div id="hand-section">
+				<div id="hand-label">Your hand</div>
+				<div id="hand"></div>
+			</div>
+			<div id="lock" class="engaged booting"><span>Waiting for arena…</span></div>
+		</div>
+	</body>
+</html>
