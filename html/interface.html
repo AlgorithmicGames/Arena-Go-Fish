@@ -578,6 +578,21 @@
 			}
 		}
 
+		function opponentsWithCards(session) {
+			const withCards = []
+			const teams = teamCount()
+			for (let team = 0; team < teams; team++) {
+				if (team === _humanTeam) continue
+				if ((session.handCounts[team] ?? 0) > 0) withCards.push(team)
+			}
+			return withCards
+		}
+
+		function autoSelectLoneOpponent(session) {
+			const withCards = opponentsWithCards(session)
+			if (withCards.length === 1) session.selectedOpponent = withCards[0]
+		}
+
 		function playerLabel(team) {
 			return team === _humanTeam ? 'You' : `Player ${team + 1}`
 		}
@@ -656,6 +671,7 @@
 					session.lastEvent = 'Your turn — ask an opponent for a card'
 					session.awaiting = 'ask'
 					session.pending = true
+					autoSelectLoneOpponent(session)
 					break
 				case 'go-fish':
 					session.pond = data.pond
